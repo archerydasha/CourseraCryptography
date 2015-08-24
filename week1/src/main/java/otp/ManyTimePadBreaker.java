@@ -19,40 +19,50 @@ public class ManyTimePadBreaker {
         for (String message : messages) {
             encodedMessages.add(new MessageForDecoding(message));
         }
-        filterMessages(encodedMessages, 0, 0, 0, 0);
-
+        //we are finding minimum length of message
+        int messageSize = 5000;
+        //ToDo - clean up dirty code here
         for (MessageForDecoding messageForDecoding : encodedMessages) {
-            if (messageForDecoding.isFullyDecoded()) {
-                String key = messageForDecoding.getKey();
-                return key;
+            if (messageForDecoding.getCiphertext().length() / 2 < messageSize) {
+                messageSize = messageForDecoding.getCiphertext().length() / 2;
             }
         }
-        return null;
-    }
+        for (int letterNumber = 0; letterNumber < messageSize; letterNumber++) {
+            //iterate through all possible letter values for 1st message
 
-    private void filterMessages(List<MessageForDecoding> encodedMessages, int firstIndex, int secondIndex, int letterNumber, int optionNumber) throws DecoderException {
-        for (int i = firstIndex; i < encodedMessages.size(); i++) {
-            for (int j = secondIndex; j < encodedMessages.size(); j++) {
-                MessageForDecoding message1 = encodedMessages.get(i);
-                MessageForDecoding message2 = encodedMessages.get(j);
-                if (!message1.equals(message2)) {
-                    byte[] bytes1 = SimpleXORUtil.getBytesFromHexString(message1.getCiphertext());
-                    byte[] bytes2 = SimpleXORUtil.getBytesFromHexString(message2.getCiphertext());
-                    int length = Math.min(bytes1.length, bytes2.length);
-                    for (int l = 0; l < length; l++) {
-                        byte xor = (byte) (bytes1[i] ^ bytes2[i]);
-                        Byte[][] possibleValues = breakingUtil.findBytesThatCouldBeXoredTo(xor);
-                        Byte[] possibleValues1 = possibleValues[0];
-                        Byte[] possibleValues2 = possibleValues[1];
-                        for (int n = 0; n < possibleValues1.length; n++) {
-                            message1.filtedPossibleValuesForLetter(possibleValues1[n], l);
-                            message2.filtedPossibleValuesForLetter(possibleValues2[n], l);
-                            filterMessages(encodedMessages, i, j+1, l+1, n);
+            for (byte candidate = SimpleBreakingUtil.STARTING_BYTE; candidate < SimpleBreakingUtil.ENDING_BYTE; candidate++) {
+                byte[] letterArray = new byte[encodedMessages.size()];
+                letterArray[0] = candidate;
+                byte valueForFirstXor = (byte) (encodedMessages.get(1).getCiphertextBytes()[letterNumber] ^ encodedMessages.get(0).getCiphertextBytes()[letterNumber]);
+                letterArray[1] = (byte) (candidate ^ valueForFirstXor);
+                int messageNumber = 2;
+                for (; messageNumber < encodedMessages.size(); messageNumber++) {
+                    byte[] values = new byte[messageNumber];
+                    int knownValueIndex = 0;
+                    for (knownValueIndex = 0; knownValueIndex < messageNumber; knownValueIndex++) {
+                        byte valueForXor = (byte) (encodedMessages.get(knownValueIndex).getCiphertextBytes()[letterNumber] ^ encodedMessages.get(messageNumber).getCiphertextBytes()[letterNumber]);
+                        values[knownValueIndex] = (byte) (letterArray[knownValueIndex] ^ valueForXor);
+                        if (knownValueIndex > 0 && values[knownValueIndex] != values[knownValueIndex - 1]) {
+                            break;
                         }
+                    }
+                    if (knownValueIndex == messageNumber) {
+                        letterArray[messageNumber] = values[0];
+                    } else {
+                        break;
+                    }
+                }
+                if (messageNumber == encodedMessages.size()) {
+                    for (int i = 0; i < letterArray.length; i++) {
+                        encodedMessages.get(i).getDecodedLetters()[letterNumber] = letterArray[i];
                     }
                 }
             }
+            //let's assume that we managed to decode all letters here
+            //ToDO - add check for this
+
         }
+        return encodedMessages.get(0).getKey();
     }
 
     public String decodeLastMessage(List<String> messages, String messageToDecode) throws DecoderException {

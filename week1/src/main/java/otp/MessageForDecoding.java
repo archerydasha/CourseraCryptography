@@ -1,6 +1,8 @@
 package otp;
 
 import com.google.common.collect.Sets;
+import org.apache.commons.codec.DecoderException;
+import sun.net.www.content.image.x_xpixmap;
 import xorutils.SimpleXORUtil;
 
 import java.util.*;
@@ -10,73 +12,51 @@ import java.util.*;
  */
 public class MessageForDecoding {
     private String ciphertext;
-    private List<Set<Byte>> possibleLetterValues;
-    private boolean fullyDecoded;
-    private String key;
+    private byte[] ciphertextBytes;
+    private byte[] decodedLetters;
 
-    public MessageForDecoding(String encodedMessage) {
+    public MessageForDecoding(String encodedMessage) throws DecoderException {
         this.ciphertext = encodedMessage;
         int initialCapacity = this.ciphertext.length() / 2;
-        possibleLetterValues = new ArrayList<Set<Byte>>(initialCapacity);
-        for (int i = 0; i < initialCapacity; i++) {
-            Set<Byte> initialSet = new HashSet<Byte>();
-            for (byte b = SimpleBreakingUtil.STARTING_BYTE; b <= SimpleBreakingUtil.ENDING_BYTE; b++) {
-                initialSet.add(b);
-            }
-            possibleLetterValues.add(initialSet);
-        }
+        decodedLetters = new byte[initialCapacity];
+        ciphertextBytes = SimpleXORUtil.getBytesFromHexString(ciphertext);
     }
-
-    public void filtedPossibleValuesForLetter(Set<Byte> values, int i) {
-        Set<Byte> currentValue = possibleLetterValues.get(i);
-        Set<Byte> newValue = Sets.intersection(currentValue, values);
-        possibleLetterValues.set(i, newValue);
-    }
-
-    public void filtedPossibleValuesForLetter(Byte value, int i) {
-        Set<Byte> otherValue = new HashSet<Byte>();
-        otherValue.add(value);
-        filtedPossibleValuesForLetter(otherValue, i);
-    }
-
 
     public String getCiphertext() {
         return ciphertext;
     }
 
-    public boolean isFullyDecoded() {
-        boolean fullyDecoded = true;
-        for (Set<Byte> letterValue : possibleLetterValues) {
-            if (letterValue.size() > 1) {
-                fullyDecoded = false;
-                break;
-            }
-        }
-        return fullyDecoded;
+    public byte[] getCiphertextBytes() {
+        return ciphertextBytes;
+    }
+
+    public byte[] getDecodedLetters() {
+        return decodedLetters;
+    }
+
+    public String getMessage() {
+        return new String(decodedLetters);
     }
 
     public String getKey() {
-        if (!isFullyDecoded()) return null;
-        byte[] bytes = new byte[possibleLetterValues.size()];
-        for (int i = 0; i < possibleLetterValues.size(); i++) {
-            for (Byte b : possibleLetterValues.get(i)) {
-                bytes[i] = b;
-            }
+        byte[] keybytes = new byte[decodedLetters.length];
+        for(int i = 0; i<decodedLetters.length; i++){
+            keybytes[i] = (byte) (ciphertextBytes[i] ^ decodedLetters[i]);
         }
-        return new String(bytes);
+        return new String(keybytes);
     }
 
     @Override
-    public boolean equals(Object other){
+    public boolean equals(Object other) {
         if (other == null) return false;
         if (other == this) return true;
-        if(!(other instanceof MessageForDecoding)) return false;
+        if (!(other instanceof MessageForDecoding)) return false;
         MessageForDecoding otherMessage = (MessageForDecoding) other;
         return Objects.equals(otherMessage.getCiphertext(), this.ciphertext);
     }
 
     @Override
-    public int hashCode(){
+    public int hashCode() {
         return Objects.hashCode(ciphertext);
     }
 }
